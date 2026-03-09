@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Clash Royale Deck Finder</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ static_version }}">
+  <script>
+    window.APP_CONFIG = {
+      staticVersion: "{{ static_version }}",
+      progressPollIntervalMs: {{ progress_poll_interval_ms|int }},
+      progressMaxPercentPerSecond: {{ progress_max_percent_per_second }},
+    };
+  </script>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js?v={{ static_version }}"></script>
+</body>
+</html>

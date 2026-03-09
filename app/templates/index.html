@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Clash Royale Deck Finder</h1>
+  <p class="lede">Find high-performing Path of Legends decks from battle logs already stored on the server.</p>
+</section>
+
+<section class="panel">
+  <form id="deck-form" class="query-grid">
+    <label>
+      <span>Days</span>
+      <input type="number" name="days" value="{{ defaults.days }}" min="1">
+    </label>
+    <label>
+      <span>Limit</span>
+      <input type="number" name="limit" value="{{ defaults.limit }}" min="1" max="100">
+    </label>
+    <label>
+      <span>Include cards</span>
+      <input type="text" name="include" placeholder="hog-rider, earthquake">
+    </label>
+    <label>
+      <span>Exclude cards</span>
+      <input type="text" name="exclude" placeholder="mirror">
+    </label>
+    <button type="submit">Search decks</button>
+  </form>
+  <div id="status" class="status">Enter filters and press Search decks.</div>
+</section>
+
+<section id="results" class="results" aria-live="polite"></section>
+
+<section class="panel stats-panel">
+  <div class="panel-header">
+    <div>
+      <h2>Database Stats</h2>
+      <p class="panel-copy">Current SQLite contents and most recent ingestion timestamps.</p>
+    </div>
+    <button type="button" class="secondary-button" id="refresh-stats">Refresh stats</button>
+  </div>
+  <div id="db-stats" class="stats-grid"></div>
+</section>
+
+<section class="panel admin">
+  <div class="panel-header">
+    <div>
+      <h2>Admin Actions</h2>
+      <p class="panel-copy">Run ingestion and cleanup operations from the local page. The Clash Royale token stays server-side.</p>
+    </div>
+  </div>
+  <div class="admin-section">
+    <h3>Ingestion</h3>
+    <div class="admin-actions">
+      <button type="button" class="admin-button" data-admin-action="sync-cards">Sync cards</button>
+      <button type="button" class="admin-button" data-admin-action="seed-players">Seed players</button>
+      <button type="button" class="admin-button" data-admin-action="expand-player-pool">Expand player pool</button>
+      <button type="button" class="admin-button" data-admin-action="ingest-battles">Ingest battles</button>
+    </div>
+  </div>
+  <div class="admin-section danger-zone">
+    <h3>Clear Data</h3>
+    <div class="admin-actions">
+      <button type="button" class="admin-button secondary-button" data-admin-action="clear-cards" data-confirm="Clear all cards?">Clear cards</button>
+      <button type="button" class="admin-button secondary-button" data-admin-action="clear-players" data-confirm="Clear all players? This also removes linked battle records.">Clear players</button>
+      <button type="button" class="admin-button secondary-button" data-admin-action="clear-battles" data-confirm="Clear all battles, decks, and battle records?">Clear battle data</button>
+      <button type="button" class="admin-button danger-button" data-admin-action="clear-all" data-confirm="Clear everything in the database?">Clear everything</button>
+    </div>
+  </div>
+  <div id="admin-status" class="status">No admin action run yet.</div>
+</section>
+
+<div id="progress-modal" class="progress-modal" hidden>
+  <div class="progress-dialog" role="dialog" aria-modal="true" aria-labelledby="progress-title">
+    <div class="progress-header">
+      <h2 id="progress-title">Working</h2>
+    </div>
+    <div class="progress-track" aria-hidden="true">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+    <div class="progress-meta">
+      <strong id="progress-count">0 / 0</strong>
+      <span id="progress-percent">0%</span>
+    </div>
+    <button type="button" id="progress-close" class="secondary-button progress-close" hidden>Close</button>
+  </div>
+</div>
+{% endblock %}
