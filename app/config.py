@@ -41,6 +41,7 @@ class Settings:
     target_player_count: int = int(getenv_local("TARGET_PLAYER_COUNT", "5000"))
     best_decks_days_default: int = int(getenv_local("BEST_DECKS_DAYS_DEFAULT", "3"))
     best_decks_limit_default: int = int(getenv_local("BEST_DECKS_LIMIT_DEFAULT", "20"))
+    duel_deck_pool_size: int = max(4, int(getenv_local("DUEL_DECK_POOL_SIZE", "40")))
     api_page_limit: int = max(1, int(getenv_local("API_PAGE_LIMIT", "100")))
 
     p0: float = float(getenv_local("P0", "20"))
@@ -52,8 +53,6 @@ class Settings:
     max_backoff_seconds: float = float(getenv_local("MAX_BACKOFF_SECONDS", "60"))
     request_initial_delay_seconds: float = float(getenv_local("REQUEST_INITIAL_DELAY_SECONDS", "1.0"))
     retry_min_delay_seconds: float = float(getenv_local("RETRY_MIN_DELAY_SECONDS", "1.0"))
-    progress_poll_interval_ms: int = max(100, int(getenv_local("PROGRESS_POLL_INTERVAL_MS", "200")))
-    progress_max_percent_per_second: float = max(5.0, float(getenv_local("PROGRESS_MAX_PERCENT_PER_SECOND", "35")))
     api_error_snippet_server: int = int(getenv_local("API_ERROR_SNIPPET_SERVER", "300"))
     api_error_snippet_generic: int = int(getenv_local("API_ERROR_SNIPPET_GENERIC", "500"))
 

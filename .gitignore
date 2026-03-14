@@ -4,5 +4,6 @@ __pycache__/
 *.pyc
 data/*.sqlite3
 data/*.db
+data/card-images/
 .pytest_cache/
 .DS_Store

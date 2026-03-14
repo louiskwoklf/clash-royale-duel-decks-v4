@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from app.clash_api import ClashApiClient
 from app.config import settings
+from app.progress import progress_tracker
 from app.utils import dedupe_preserve_order, encode_tag, json_dumps, mode_tokens, normalize_tag, slugify, to_iso_or_now, utc_now_iso, walk_dicts
 
 ProgressCallback = Callable[[int, int, str], None]
@@ -58,35 +59,60 @@ def sync_cards_catalog(
     conn: sqlite3.Connection,
     api: ClashApiClient,
     progress: ProgressCallback | None = None,
+    *,
+    resume: bool = False,
 ) -> int:
     payload = api.get("/cards")
-    items = payload.get("items", []) if isinstance(payload, dict) else []
-    count = 0
-    total = len(items)
-    if progress is not None:
-        progress(0, total, "Fetched card catalog.")
-
-    for card in items:
+    raw_items = payload.get("items", []) if isinstance(payload, dict) else []
+    items: list[dict[str, Any]] = []
+    for card in raw_items:
         if not isinstance(card, dict):
             continue
-        next_count = count + 1
-        if progress is not None:
-            progress(next_count, total, f"Syncing {next_count} of {total} cards.")
         card_id = card.get("id")
         name = str(card.get("name", "")).strip()
         if not isinstance(card_id, int) or not name:
             continue
+        items.append(card)
+
+    total = len(items)
+    synced_ids: set[int] = set()
+    if resume and items:
+        card_ids = [int(card["id"]) for card in items]
+        rows = conn.execute(
+            f"SELECT id FROM cards WHERE last_synced_at <> '' AND id IN ({','.join('?' for _ in card_ids)})",
+            card_ids,
+        ).fetchall()
+        synced_ids = {int(row["id"]) for row in rows}
+    elif items:
+        card_ids = [int(card["id"]) for card in items]
+        conn.execute(
+            f"UPDATE cards SET last_synced_at = '' WHERE id IN ({','.join('?' for _ in card_ids)})",
+            card_ids,
+        )
+        conn.commit()
+
+    count = len(synced_ids)
+    if progress is not None:
+        progress(count, total, "Fetched card catalog.")
+
+    for card in items:
+        progress_tracker.raise_if_stopped()
+        card_id = int(card["id"])
+        name = str(card["name"]).strip()
+        if resume and card_id in synced_ids:
+            continue
         icon_urls = card.get("iconUrls", {}) if isinstance(card.get("iconUrls"), dict) else {}
         conn.execute(
             """
-            INSERT INTO cards (id, name, slug, max_level, elixir_cost, icon_url, raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO cards (id, name, slug, max_level, elixir_cost, icon_url, last_synced_at, raw_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 slug = excluded.slug,
                 max_level = excluded.max_level,
                 elixir_cost = excluded.elixir_cost,
                 icon_url = excluded.icon_url,
+                last_synced_at = excluded.last_synced_at,
                 raw_json = excluded.raw_json
             """,
             (
@@ -96,11 +122,14 @@ def sync_cards_catalog(
                 card.get("maxLevel"),
                 card.get("elixirCost"),
                 icon_urls.get("medium", ""),
+                utc_now_iso(),
                 json_dumps(card),
             ),
         )
         count += 1
         conn.commit()
+        if progress is not None:
+            progress(count, total, f"Syncing {count} of {total} cards.")
 
     return count
 
@@ -412,6 +441,8 @@ def _try_path_of_legends_endpoints(api: ClashApiClient) -> list[str]:
         "/locations/global/pathoflegend/players",
         "/locations/global/rankings/pathoflegend/players",
     ]
+    last_error: Exception | None = None
+    had_successful_response = False
     for location_id in _global_season_codes():
         candidates.extend(
             [
@@ -423,10 +454,14 @@ def _try_path_of_legends_endpoints(api: ClashApiClient) -> list[str]:
     for endpoint in dedupe_preserve_order(candidates):
         try:
             tags = _fetch_tags_from_endpoint(api, endpoint)
-        except Exception:
+        except Exception as exc:
+            last_error = exc
             continue
+        had_successful_response = True
         if tags:
             return tags
+    if not had_successful_response and last_error is not None:
+        raise last_error
     return []
 
 
@@ -449,16 +484,32 @@ def seed_top_players(
     conn: sqlite3.Connection,
     api: ClashApiClient,
     progress: ProgressCallback | None = None,
+    *,
+    resume: bool = False,
 ) -> int:
     tags = fetch_top_path_of_legends_players_from_leaderboards(api)
-    count = 0
     total = len(tags)
+    seeded_tags: set[str] = set()
+    if resume and tags:
+        rows = conn.execute(
+            f"SELECT tag FROM players WHERE last_seeded_at <> '' AND tag IN ({','.join('?' for _ in tags)})",
+            tags,
+        ).fetchall()
+        seeded_tags = {str(row["tag"]) for row in rows}
+    elif tags:
+        conn.execute(
+            f"UPDATE players SET last_seeded_at = '' WHERE tag IN ({','.join('?' for _ in tags)})",
+            tags,
+        )
+        conn.commit()
+
+    count = len(seeded_tags)
     if progress is not None:
-        progress(0, total, "Fetched leaderboard players.")
+        progress(count, total, "Fetched leaderboard players.")
     for tag in tags:
-        next_count = count + 1
-        if progress is not None:
-            progress(next_count, total, f"Seeding {next_count} of {total} players.")
+        progress_tracker.raise_if_stopped()
+        if resume and tag in seeded_tags:
+            continue
         upsert_player(conn, {"tag": tag}, source="path-of-legends")
         conn.execute(
             "UPDATE players SET last_seeded_at = ?, source = ? WHERE tag = ?",
@@ -466,6 +517,8 @@ def seed_top_players(
         )
         count += 1
         conn.commit()
+        if progress is not None:
+            progress(count, total, f"Seeding {count} of {total} players.")
     return count
 
 
@@ -474,23 +527,34 @@ def expand_player_pool(
     api: ClashApiClient,
     progress: ProgressCallback | None = None,
 ) -> int:
+    status_message = "Scanning battle logs for new players."
     target = settings.target_player_count
     starting_count = int(conn.execute("SELECT COUNT(*) AS count FROM players").fetchone()["count"])
+    seeded_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM players
+            WHERE last_seeded_at <> ''
+            """
+        ).fetchone()[0]
+    )
+    seeded_baseline = min(seeded_count, target)
     current = starting_count
-    target_new_players = max(0, target - starting_count)
+    progress_total = max(0, target - seeded_baseline)
     if current >= target:
         if progress is not None:
-            progress(0, 0, "Player pool already at target.")
+            progress(progress_total, progress_total, "Player pool already at target.")
         return 0
 
     discovered = 0
-    processed = 0
     while current < target:
+        progress_tracker.raise_if_stopped()
         if progress is not None:
             progress(
-                discovered,
-                target_new_players,
-                f"Scanned {processed} sources and discovered {discovered} of {target_new_players} players.",
+                max(0, current - seeded_baseline),
+                progress_total,
+                status_message,
             )
         rows = conn.execute(
             """
@@ -505,20 +569,21 @@ def expand_player_pool(
             break
 
         for row in rows:
+            progress_tracker.raise_if_stopped()
             player_tag = str(row["tag"])
             battlelog = fetch_player_battlelog(api, player_tag)
-            conn.execute("UPDATE players SET last_expanded_at = ? WHERE tag = ?", (utc_now_iso(), player_tag))
-            processed += 1
             if progress is not None:
                 progress(
-                    discovered,
-                    target_new_players,
-                    f"Scanning source {processed}: {player_tag}. Discovered {discovered} of {target_new_players} players.",
+                    max(0, current - seeded_baseline),
+                    progress_total,
+                    status_message,
                 )
             for battle in battlelog:
+                progress_tracker.raise_if_stopped()
                 if not is_path_of_legends_battle(battle):
                     continue
                 for tag in extract_player_tags(battle):
+                    progress_tracker.raise_if_stopped()
                     if conn.execute("SELECT 1 FROM players WHERE tag = ?", (tag,)).fetchone() is not None:
                         continue
                     if current >= target:
@@ -527,15 +592,16 @@ def expand_player_pool(
                     upsert_player(conn, {"tag": tag}, source="battlelog")
                     current += 1
                     discovered += 1
+                    conn.commit()
                     if progress is not None:
                         progress(
-                            discovered,
-                            target_new_players,
-                            f"Scanning source {processed}: {player_tag}. Discovered {discovered} of {target_new_players} players.",
+                            max(0, current - seeded_baseline),
+                            progress_total,
+                            status_message,
                         )
                     if current >= target:
-                        conn.commit()
                         return discovered
+            conn.execute("UPDATE players SET last_expanded_at = ? WHERE tag = ?", (utc_now_iso(), player_tag))
             conn.commit()
     return discovered
 
@@ -636,6 +702,15 @@ def ingest_battles(
     progress: ProgressCallback | None = None,
 ) -> int:
     inserted = 0
+    completed_count = int(
+        conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM players
+            WHERE last_battlelog_at <> ''
+            """
+        ).fetchone()[0]
+    )
     rows = conn.execute(
         """
         SELECT tag
@@ -645,11 +720,16 @@ def ingest_battles(
         """
     ).fetchall()
     pending_tags = [str(row["tag"]) for row in rows]
-    total = len(pending_tags)
+    total = completed_count + len(pending_tags)
+    current = completed_count
+
+    if progress is not None:
+        progress(current, total, "Scanning player battle logs...")
 
     for index, player_tag in enumerate(pending_tags, start=1):
-        if progress is not None:
-            progress(index, total, f"Scanning player {index} of {total}: {player_tag}")
+        progress_tracker.raise_if_stopped()
         inserted += ingest_player_battlelog(conn, api, player_tag)
         conn.commit()
+        if progress is not None:
+            progress(completed_count + index, total, player_tag)
     return inserted

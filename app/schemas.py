@@ -26,6 +26,22 @@ class DeckResponseItem(BaseModel):
     win_rate: float
 
 
+class DuelDeckResponseItem(BaseModel):
+    combo_key: str
+    unique_card_count: int
+    total_final_score: float
+    total_games: float
+    total_unique_players: int
+    subdecks: list[DeckResponseItem]
+
+
+class DuelDeckQueryResponse(BaseModel):
+    source_pool_size: int
+    source_deck_count: int
+    source_decks: list[DeckResponseItem]
+    duel_decks: list[DuelDeckResponseItem]
+
+
 class AdminActionResponse(BaseModel):
     ok: bool
     message: str
@@ -48,4 +64,5 @@ class AdminProgressResponse(BaseModel):
     total: int
     percent: float
     active: bool
+    stoppable: bool
     updated_at: str

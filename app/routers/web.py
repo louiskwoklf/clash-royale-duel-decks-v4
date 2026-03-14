@@ -21,16 +21,15 @@ STATIC_VERSION = str(int(max(
 
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
+    default_days = max(1, min(7, settings.best_decks_days_default))
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "static_version": STATIC_VERSION,
-            "progress_poll_interval_ms": settings.progress_poll_interval_ms,
-            "progress_max_percent_per_second": settings.progress_max_percent_per_second,
             "defaults": {
-                "days": settings.best_decks_days_default,
-                "limit": settings.best_decks_limit_default,
+                "days": default_days,
+                "duel_deck_pool_size": settings.duel_deck_pool_size,
             },
         },
     )

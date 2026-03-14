@@ -1,19 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="hero">
-  <h1>Clash Royale Deck Finder</h1>
-  <p class="lede">Find high-performing Path of Legends decks from battle logs already stored on the server.</p>
+  <h1>Clash Royale Duel Decks</h1>
 </section>
 
 <section class="panel">
-  <form id="deck-form" class="query-grid">
-    <label>
-      <span>Days</span>
-      <input type="number" name="days" value="{{ defaults.days }}" min="1">
-    </label>
-    <label>
-      <span>Limit</span>
-      <input type="number" name="limit" value="{{ defaults.limit }}" min="1" max="100">
+  <div class="panel-header">
+    <div>
+      <h2>Build Duel Decks</h2>
+    </div>
+  </div>
+  <form id="duel-deck-form" class="query-grid duel-query-grid">
+    <label class="slider-field">
+      <div class="field-head">
+        <span>Days</span>
+        <output id="days-value" for="days-input">{{ defaults.days }}</output>
+      </div>
+      <input id="days-input" type="range" name="days" value="{{ defaults.days }}" min="1" max="7" step="1">
     </label>
     <label>
       <span>Include cards</span>
@@ -23,19 +26,31 @@
       <span>Exclude cards</span>
       <input type="text" name="exclude" placeholder="mirror">
     </label>
-    <button type="submit">Search decks</button>
+    <button type="submit">Build duel decks</button>
   </form>
-  <div id="status" class="status">Enter filters and press Search decks.</div>
 </section>
 
-<section id="results" class="results" aria-live="polite"></section>
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Duel Deck Results</h2>
+    </div>
+  </div>
+  <section id="results" class="results duel-results" aria-live="polite"></section>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Ranked Deck Pool</h2>
+    </div>
+  </div>
+  <section id="source-results" class="results source-results" aria-live="polite"></section>
+</section>
 
 <section class="panel stats-panel">
   <div class="panel-header">
-    <div>
-      <h2>Database Stats</h2>
-      <p class="panel-copy">Current SQLite contents and most recent ingestion timestamps.</p>
-    </div>
+    <h2>Database Stats</h2>
     <button type="button" class="secondary-button" id="refresh-stats">Refresh stats</button>
   </div>
   <div id="db-stats" class="stats-grid"></div>
@@ -43,10 +58,7 @@
 
 <section class="panel admin">
   <div class="panel-header">
-    <div>
-      <h2>Admin Actions</h2>
-      <p class="panel-copy">Run ingestion and cleanup operations from the local page. The Clash Royale token stays server-side.</p>
-    </div>
+    <h2>Admin Actions</h2>
   </div>
   <div class="admin-section">
     <h3>Ingestion</h3>
@@ -66,21 +78,21 @@
       <button type="button" class="admin-button danger-button" data-admin-action="clear-all" data-confirm="Clear everything in the database?">Clear everything</button>
     </div>
   </div>
-  <div id="admin-status" class="status">No admin action run yet.</div>
 </section>
 
 <div id="progress-modal" class="progress-modal" hidden>
   <div class="progress-dialog" role="dialog" aria-modal="true" aria-labelledby="progress-title">
     <div class="progress-header">
       <h2 id="progress-title">Working</h2>
+      <span id="progress-status" class="progress-status">Running</span>
     </div>
     <div class="progress-track" aria-hidden="true">
       <div id="progress-fill" class="progress-fill"></div>
     </div>
     <div class="progress-meta">
-      <strong id="progress-count">0 / 0</strong>
       <span id="progress-percent">0%</span>
     </div>
+    <p id="progress-error" class="progress-error" hidden></p>
     <button type="button" id="progress-close" class="secondary-button progress-close" hidden>Close</button>
   </div>
 </div>

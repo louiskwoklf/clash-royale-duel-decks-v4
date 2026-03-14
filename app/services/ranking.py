@@ -26,6 +26,16 @@ class DeckMetric:
     win_rate: float
 
 
+@dataclass
+class DuelDeckMetric:
+    combo_key: str
+    unique_card_count: int
+    total_final_score: float
+    total_games: float
+    total_unique_players: int
+    subdecks: list[DeckMetric]
+
+
 def resolve_card_filters(
     conn: sqlite3.Connection,
     include_cards: list[str],
@@ -192,6 +202,43 @@ def query_best_decks(
     )
 
 
+def build_duel_deck_metrics(decks: list[DeckMetric]) -> list[DuelDeckMetric]:
+    if len(decks) < 4:
+        return []
+
+    card_sets = [set(deck.cards) for deck in decks]
+    bundles: list[DuelDeckMetric] = []
+    selection: list[int] = []
+
+    def search(start_index: int, used_cards: set[int]) -> None:
+        if len(selection) == 4:
+            subdecks = [decks[index] for index in selection]
+            bundles.append(
+                DuelDeckMetric(
+                    combo_key="||".join(deck.deck_signature for deck in subdecks),
+                    unique_card_count=len(used_cards),
+                    total_final_score=sum(deck.final_score for deck in subdecks),
+                    total_games=sum(deck.games for deck in subdecks),
+                    total_unique_players=sum(deck.unique_players for deck in subdecks),
+                    subdecks=subdecks,
+                )
+            )
+            return
+
+        remaining_slots = 4 - len(selection)
+        max_start = len(decks) - remaining_slots + 1
+        for index in range(start_index, max_start):
+            card_set = card_sets[index]
+            if len(card_set) != 8 or used_cards.intersection(card_set):
+                continue
+            selection.append(index)
+            search(index + 1, used_cards.union(card_set))
+            selection.pop()
+
+    search(0, set())
+    return bundles
+
+
 def load_card_image_url_map(conn: sqlite3.Connection) -> dict[str, dict[str, str]]:
     rows = conn.execute("SELECT slug, icon_url, raw_json FROM cards").fetchall()
     mapping: dict[str, dict[str, str]] = {}
@@ -245,4 +292,23 @@ def serialize_deck_metric(
         "stability": deck.stability,
         "final_score": deck.final_score,
         "win_rate": deck.win_rate,
+    }
+
+
+def serialize_duel_deck_metric(
+    conn: sqlite3.Connection,
+    duel_deck: DuelDeckMetric,
+    image_map: dict[str, dict[str, str]] | None = None,
+) -> dict:
+    resolved_image_map = image_map if image_map is not None else load_card_image_url_map(conn)
+    return {
+        "combo_key": duel_deck.combo_key,
+        "unique_card_count": duel_deck.unique_card_count,
+        "total_final_score": duel_deck.total_final_score,
+        "total_games": duel_deck.total_games,
+        "total_unique_players": duel_deck.total_unique_players,
+        "subdecks": [
+            serialize_deck_metric(conn, deck, image_map=resolved_image_map)
+            for deck in duel_deck.subdecks
+        ],
     }

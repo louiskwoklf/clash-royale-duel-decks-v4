@@ -62,7 +62,19 @@ class ClashApiClient:
                 if response.status_code >= 500
                 else settings.api_error_snippet_generic
             )
-            raise ApiError(response.status_code, response.text[:snippet_limit] or response.reason)
+            payload: Any | None = None
+            message = ""
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = None
+            if isinstance(payload, dict):
+                message_value = payload.get("message")
+                if isinstance(message_value, str):
+                    message = message_value.strip()
+            if not message:
+                message = response.text[:snippet_limit] or response.reason
+            raise ApiError(response.status_code, message, payload=payload)
 
         raise ApiError(500, "Request failed after retries")
 

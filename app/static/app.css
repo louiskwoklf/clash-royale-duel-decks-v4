@@ -63,13 +63,6 @@ h1 {
   line-height: 0.95;
 }
 
-.lede {
-  max-width: 54rem;
-  color: var(--muted);
-  font-size: 1.05rem;
-  line-height: 1.6;
-}
-
 .panel {
   margin-top: 24px;
   padding: 22px;
@@ -87,16 +80,15 @@ h1 {
   gap: 16px;
 }
 
-.panel-copy {
-  margin: 8px 0 0;
-  color: var(--muted);
-}
-
 .query-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   align-items: end;
+}
+
+.duel-query-grid {
+  grid-template-columns: 120px repeat(2, minmax(0, 1fr)) 220px;
 }
 
 .query-grid label {
@@ -111,6 +103,20 @@ h1 {
   color: var(--text);
 }
 
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.slider-field output {
+  min-width: 1.5rem;
+  text-align: right;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
 input,
 button {
   width: 100%;
@@ -123,6 +129,11 @@ button {
 input {
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
+}
+
+input[type="range"] {
+  padding: 0;
+  accent-color: var(--accent-strong);
 }
 
 button {
@@ -161,6 +172,14 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   margin-top: 26px;
+}
+
+.duel-results {
+  grid-template-columns: 1fr;
+}
+
+.source-results {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .stats-grid {
@@ -206,6 +225,67 @@ button:disabled {
   font-size: 1.55rem;
 }
 
+.duel-deck-card {
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(74, 55, 33, 0.14);
+  background: rgba(255, 251, 245, 0.94);
+  box-shadow: var(--shadow);
+  transform: translateY(12px);
+  opacity: 0;
+  animation: rise 360ms ease forwards;
+}
+
+.duel-deck-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.duel-deck-header h3 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.duel-deck-copy {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.duel-deck-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.subdeck-card {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(74, 55, 33, 0.12);
+}
+
+.subdeck-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subdeck-header h4 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.subdeck-score {
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
 .deck-cards-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -243,6 +323,14 @@ button:disabled {
   color: var(--accent-strong);
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.empty-state {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px dashed rgba(74, 55, 33, 0.22);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--muted);
 }
 
 .admin-routes {
@@ -300,8 +388,52 @@ button:disabled {
   gap: 16px;
 }
 
+.progress-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .progress-header h2 {
   margin: 0;
+}
+
+.progress-status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(74, 55, 33, 0.08);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.progress-status[data-status="running"] {
+  background: rgba(217, 109, 49, 0.14);
+  color: var(--accent-strong);
+}
+
+.progress-status[data-status="stopping"] {
+  background: rgba(191, 121, 40, 0.16);
+  color: #8d4b16;
+}
+
+.progress-status[data-status="stopped"] {
+  background: rgba(74, 55, 33, 0.12);
+  color: var(--text);
+}
+
+.progress-status[data-status="success"] {
+  background: rgba(44, 122, 77, 0.14);
+  color: #1f6b3a;
+}
+
+.progress-status[data-status="error"] {
+  background: rgba(143, 36, 23, 0.14);
+  color: #8f2417;
 }
 
 .progress-track {
@@ -322,9 +454,21 @@ button:disabled {
 .progress-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   color: var(--text);
+}
+
+.progress-error {
+  margin: -4px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(143, 36, 23, 0.08);
+  border: 1px solid rgba(143, 36, 23, 0.16);
+  color: #7a1b15;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .progress-close {
@@ -348,12 +492,21 @@ code {
 
 
 @media (max-width: 860px) {
-  .query-grid {
+  .query-grid,
+  .duel-query-grid {
     grid-template-columns: 1fr 1fr;
   }
 
   .panel-header {
     flex-direction: column;
+  }
+
+  .duel-deck-header {
+    flex-direction: column;
+  }
+
+  .duel-deck-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -362,7 +515,8 @@ code {
     padding: 24px 14px 40px;
   }
 
-  .query-grid {
+  .query-grid,
+  .duel-query-grid {
     grid-template-columns: 1fr;
   }
 

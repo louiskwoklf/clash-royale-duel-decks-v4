@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS cards (
     max_level INTEGER,
     elixir_cost INTEGER,
     icon_url TEXT NOT NULL DEFAULT '',
+    last_synced_at TEXT NOT NULL DEFAULT '',
     raw_json TEXT NOT NULL DEFAULT '{}'
 );
 
@@ -103,6 +104,8 @@ def _table_has_column(conn: sqlite3.Connection, table: str, column: str) -> bool
 def _ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     if not _table_has_column(conn, "decks", "card_keys_json"):
         conn.execute("ALTER TABLE decks ADD COLUMN card_keys_json TEXT NOT NULL DEFAULT '[]'")
+    if not _table_has_column(conn, "cards", "last_synced_at"):
+        conn.execute("ALTER TABLE cards ADD COLUMN last_synced_at TEXT NOT NULL DEFAULT ''")
 
 
 def _migrate_variant_decks(conn: sqlite3.Connection) -> None:
@@ -222,14 +225,18 @@ def reclaim_disk_space(conn: sqlite3.Connection) -> None:
     conn.execute("VACUUM")
 
 
-def get_db_stats(conn: sqlite3.Connection) -> dict[str, Any]:
-    counts = {
+def get_record_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    return {
         "players": int(conn.execute("SELECT COUNT(*) FROM players").fetchone()[0]),
         "cards": int(conn.execute("SELECT COUNT(*) FROM cards").fetchone()[0]),
         "battles": int(conn.execute("SELECT COUNT(*) FROM battles").fetchone()[0]),
         "decks": int(conn.execute("SELECT COUNT(*) FROM decks").fetchone()[0]),
         "battle_records": int(conn.execute("SELECT COUNT(*) FROM deck_observations").fetchone()[0]),
     }
+
+
+def get_db_stats(conn: sqlite3.Connection) -> dict[str, Any]:
+    counts = get_record_counts(conn)
     size_bytes = sum(path.stat().st_size for path in _database_file_paths() if path.exists())
 
     return {

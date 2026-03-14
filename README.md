@@ -1,6 +1,6 @@
 # clash-royale-duel-decks-v4
 
-Web app for discovering and ranking Clash Royale Path of Legends decks from recently ingested battle logs.
+Web app for building Clash Royale duel decks from ranked Path of Legends decks stored from recently ingested battle logs.
 
 ## Features
 - Sync cards from the Clash Royale API
@@ -8,7 +8,8 @@ Web app for discovering and ranking Clash Royale Path of Legends decks from rece
 - Expand the player pool from battle opponents
 - Ingest battle logs into SQLite
 - Query ranked decks with include and exclude filters
-- Browse deck results in a small web UI or JSON API
+- Build 4-deck duel bundles with 32 unique cards from the top filtered ranked decks
+- Browse duel deck results in the web UI or JSON API
 
 Rankings are based on battle-log entries whose battle `type` is `pathoflegend`. If you previously ingested mixed-mode data, clear battle data and ingest again to rebuild with strict Path of Legends storage.
 
@@ -23,8 +24,7 @@ Rankings are based on battle-log entries whose battle `type` is `pathoflegend`. 
 - `API_TOKEN`: Clash Royale API token. Keep this server-side only.
 - `BASE_URL`: Clash Royale API base URL.
 - `SQLITE_DB_PATH`: SQLite database path. One SQLite file contains multiple tables, so the default name is intentionally generic.
-- `PROGRESS_POLL_INTERVAL_MS`: How often the browser polls for admin-job progress. Lower values feel more responsive but make more requests.
-- `PROGRESS_MAX_PERCENT_PER_SECOND`: Caps how fast the progress bar and percent readout can advance on screen.
+- `DUEL_DECK_POOL_SIZE`: How many top-ranked individual decks are considered when building duel deck bundles.
 - Ranking, retry, and ingestion tuning values are also defined in `.env.example`.
 
 ## Run
@@ -57,14 +57,15 @@ curl -X POST http://127.0.0.1:8000/api/admin/expand-player-pool
 curl -X POST http://127.0.0.1:8000/api/admin/ingest-battles
 ```
 
-After that, the homepage and `GET /api/decks` should return stored results.
+After that, the homepage and `GET /api/duel-decks` should return stored results.
 
 On startup, the app also upgrades older databases to preserve variant-aware deck card keys derived from stored battle JSON, such as `-ev1` and `-hero`, so existing battle data does not need to be wiped just to recover those identifiers.
 
 ## Main Routes
-- `GET /`: HTML dashboard
+- `GET /`: HTML dashboard for building duel decks
 - `GET /api/health`: health check
 - `GET /api/decks`: ranked deck query
+- `GET /api/duel-decks`: duel deck builder query from the top filtered ranked decks
 - `GET /api/admin/stats`: database counts and recent timestamps
 - `POST /api/admin/sync-cards`: refresh card catalog
 - `POST /api/admin/seed-players`: seed Path of Legends players

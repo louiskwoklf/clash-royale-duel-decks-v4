@@ -9,7 +9,7 @@ from app.routers.api import router as api_router
 from app.routers.web import router as web_router
 
 
-app = FastAPI(title="Clash Royale Deck Finder")
+app = FastAPI(title="Clash Royale Duel Deck Finder")
 
 
 @app.on_event("startup")
