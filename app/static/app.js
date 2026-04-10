@@ -2,6 +2,10 @@ function formatPercent(value) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+const PATH_IDLE_MESSAGE = "Ranked ladder decks will appear here after you click Load ranked board.";
+const DUEL_IDLE_MESSAGE = "Four-deck duel lineups will appear here after you click Build duel decks.";
+const SOURCE_IDLE_MESSAGE = "The ranked deck pool feeding duel bundles will appear here after you click Build duel decks.";
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -595,14 +599,14 @@ async function runAdminAction(
   }
 
   await loadStats(statsEl);
-  pathResultsEl.innerHTML = renderEmptyState("Refresh the ranked board after admin jobs change the dataset.");
+  pathResultsEl.innerHTML = renderEmptyState(PATH_IDLE_MESSAGE);
   resultsEl.innerHTML = "";
   sourceResultsEl.innerHTML = "";
-  resultsEl.innerHTML = renderEmptyState("Build duel decks again to reflect the updated dataset.");
-  sourceResultsEl.innerHTML = renderEmptyState("The ranked source pool will repopulate after the next duel query.");
-  setText(pathSummaryEl, "Ranked ladder decks will appear here after the board loads.");
-  setText(duelSummaryEl, "Four-deck duel lineups will appear here after the builder runs.");
-  setText(sourceSummaryEl, "The ranked deck pool feeding duel bundles will appear here.");
+  resultsEl.innerHTML = renderEmptyState(DUEL_IDLE_MESSAGE);
+  sourceResultsEl.innerHTML = renderEmptyState(SOURCE_IDLE_MESSAGE);
+  setText(pathSummaryEl, PATH_IDLE_MESSAGE);
+  setText(duelSummaryEl, DUEL_IDLE_MESSAGE);
+  setText(sourceSummaryEl, SOURCE_IDLE_MESSAGE);
   setAdminButtonsDisabled(adminButtons, false);
 }
 
@@ -652,8 +656,6 @@ function initPage() {
   const progressRenderer = createProgressRenderer(progressElements);
   const progressStream = createProgressStream(progressRenderer);
   let statsLoaded = false;
-  let pathLoaded = false;
-  let duelLoaded = false;
 
   const syncDaysValue = (input, output) => {
     output.textContent = input.value;
@@ -664,9 +666,12 @@ function initPage() {
   pathDaysInputEl.addEventListener("input", () => syncDaysValue(pathDaysInputEl, pathDaysValueEl));
   duelDaysInputEl.addEventListener("input", () => syncDaysValue(duelDaysInputEl, duelDaysValueEl));
 
-  pathResultsEl.innerHTML = renderEmptyState("Ranked ladder decks will appear here after the board loads.");
-  duelResultsEl.innerHTML = renderEmptyState("Four-deck duel lineups will appear here after the builder runs.");
-  sourceResultsEl.innerHTML = renderEmptyState("The ranked deck pool feeding duel bundles will appear here.");
+  setText(pathSummaryEl, PATH_IDLE_MESSAGE);
+  setText(duelSummaryEl, DUEL_IDLE_MESSAGE);
+  setText(sourceSummaryEl, SOURCE_IDLE_MESSAGE);
+  pathResultsEl.innerHTML = renderEmptyState(PATH_IDLE_MESSAGE);
+  duelResultsEl.innerHTML = renderEmptyState(DUEL_IDLE_MESSAGE);
+  sourceResultsEl.innerHTML = renderEmptyState(SOURCE_IDLE_MESSAGE);
 
   async function refreshPathDecks() {
     setButtonBusy(pathSubmitButton, true, "Loading board...");
@@ -686,9 +691,7 @@ function initPage() {
         pathResultsEl.innerHTML = renderEmptyState("No Path of Legends decks matched these filters.");
         setText(pathSummaryEl, "No ranked decks matched the current Path of Legends filters.");
       }
-      pathLoaded = true;
     } catch (error) {
-      pathLoaded = false;
       pathResultsEl.innerHTML = renderEmptyState(
         error instanceof Error ? error.message : "Failed to load Path of Legends decks.",
         "error",
@@ -725,9 +728,7 @@ function initPage() {
           ? `Using ${pluralize(sourceDeckCount, "ranked candidate deck")} from a pool of ${data.source_pool_size}.`
           : "No ranked candidate decks were available for the current duel filters.",
       );
-      duelLoaded = true;
     } catch (error) {
-      duelLoaded = false;
       duelResultsEl.innerHTML = renderEmptyState(
         error instanceof Error ? error.message : "Failed to load duel decks.",
         "error",
@@ -773,14 +774,6 @@ function initPage() {
       history.replaceState(null, "", `#${selectedView}`);
     }
 
-    if (selectedView === "path" && !pathLoaded) {
-      await refreshPathDecks();
-      return;
-    }
-    if (selectedView === "duel" && !duelLoaded) {
-      await refreshDuelDecks();
-      return;
-    }
     if (selectedView === "admin") {
       await ensureStatsLoaded();
     }
@@ -862,8 +855,6 @@ function initPage() {
           progressStream,
         );
         statsLoaded = true;
-        pathLoaded = false;
-        duelLoaded = false;
       } catch (_error) {
         setAdminButtonsDisabled(adminButtons, false);
       }
