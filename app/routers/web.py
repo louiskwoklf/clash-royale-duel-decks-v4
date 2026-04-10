@@ -12,10 +12,16 @@ from app.config import settings
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+BACKGROUND_PATTERN_PATH = Path("data/background-images/blue-rhombus.png")
 STATIC_VERSION = str(int(max(
-    Path("app/static/app.css").stat().st_mtime,
-    Path("app/static/app.js").stat().st_mtime,
-    Path("app/static/sw.js").stat().st_mtime,
+    path.stat().st_mtime
+    for path in (
+        Path("app/static/app.css"),
+        Path("app/static/app.js"),
+        Path("app/static/sw.js"),
+        BACKGROUND_PATTERN_PATH,
+    )
+    if path.exists()
 )))
 
 
@@ -27,8 +33,14 @@ def home(request: Request):
         {
             "request": request,
             "static_version": STATIC_VERSION,
+            "background_pattern_url": (
+                f"/background-images/{BACKGROUND_PATTERN_PATH.name}?v={STATIC_VERSION}"
+                if BACKGROUND_PATTERN_PATH.exists()
+                else ""
+            ),
             "defaults": {
                 "days": default_days,
+                "limit": max(1, min(100, settings.best_decks_limit_default)),
                 "duel_deck_pool_size": settings.duel_deck_pool_size,
             },
         },

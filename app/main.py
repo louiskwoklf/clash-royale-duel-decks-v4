@@ -9,7 +9,7 @@ from app.routers.api import router as api_router
 from app.routers.web import router as web_router
 
 
-app = FastAPI(title="Clash Royale Duel Deck Finder")
+app = FastAPI(title="Clash Royale Deck Forge")
 
 
 @app.on_event("startup")
@@ -19,5 +19,10 @@ def on_startup() -> None:
 
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount(
+    "/background-images",
+    StaticFiles(directory="data/background-images", check_dir=False),
+    name="background-images",
+)
 app.include_router(web_router)
 app.include_router(api_router)

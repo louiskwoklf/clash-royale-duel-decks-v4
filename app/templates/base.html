@@ -3,17 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Clash Royale Duel Decks</title>
+  <title>Clash Royale Deck Forge</title>
   <link rel="stylesheet" href="/static/app.css?v={{ static_version }}">
   <script>
     window.APP_CONFIG = {
       staticVersion: "{{ static_version }}",
+      duelDeckPoolSize: {{ defaults.duel_deck_pool_size if defaults is defined else 0 }},
     };
   </script>
 </head>
-<body>
+<body{% if background_pattern_url %} style="--pattern-url: url('{{ background_pattern_url }}');"{% endif %}>
   <div class="backdrop"></div>
-  <main class="container">
+  <main class="container site-shell">
     {% block content %}{% endblock %}
   </main>
   <script src="/static/app.js?v={{ static_version }}"></script>

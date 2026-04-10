@@ -53,14 +53,53 @@ function renderDeckMetrics(deck) {
   `;
 }
 
-function renderSourceDeck(deck, index) {
+function renderDeckSignals(deck) {
+  return `
+    <div class="signal-row">
+      <span class="metric-pill">Confidence ${formatPercent(deck.confidence)}</span>
+      <span class="metric-pill">Popularity ${formatPercent(deck.popularity)}</span>
+      <span class="metric-pill">Stability ${formatPercent(deck.stability)}</span>
+    </div>
+  `;
+}
+
+function renderDeckCard(deck, index, options = {}) {
+  const kicker = escapeHtml(options.kicker || "Deck");
+  const title = escapeHtml(options.title || `Deck ${index + 1}`);
+  const badge = options.badge
+    ? `<span class="metric-badge">${escapeHtml(options.badge)}</span>`
+    : "";
+
   return `
     <article class="deck-card" style="animation-delay:${index * 40}ms">
-      <h3>Pool #${index + 1}</h3>
+      <div class="deck-card-header">
+        <div>
+          <p class="deck-kicker">${kicker}</p>
+          <h3>${title}</h3>
+        </div>
+        ${badge}
+      </div>
       ${renderDeckCardGrid(deck)}
       ${renderDeckMetrics(deck)}
+      ${renderDeckSignals(deck)}
     </article>
   `;
+}
+
+function renderPathDeck(deck, index) {
+  return renderDeckCard(deck, index, {
+    kicker: "Path of Legends",
+    title: `Rank ${index + 1}`,
+    badge: `${deck.card_keys.length} cards`,
+  });
+}
+
+function renderSourceDeck(deck, index) {
+  return renderDeckCard(deck, index, {
+    kicker: "Candidate Pool",
+    title: `Pool #${index + 1}`,
+    badge: `${deck.card_keys.length} cards`,
+  });
 }
 
 function renderSubdeck(deck, index) {
@@ -97,8 +136,39 @@ function renderDuelDeck(duelDeck, index) {
   `;
 }
 
-function renderEmptyState(message) {
-  return `<article class="empty-state">${escapeHtml(message)}</article>`;
+function renderEmptyState(message, tone = "default") {
+  const errorClass = tone === "error" ? " is-error" : "";
+  return `<article class="empty-state${errorClass}">${escapeHtml(message)}</article>`;
+}
+
+async function fetchJson(url, options) {
+  const response = await fetch(url, options);
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.detail || payload?.message || "Request failed.");
+  }
+  return payload;
+}
+
+function setText(element, value) {
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function pluralize(value, singular, plural = `${singular}s`) {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function setButtonBusy(button, busy, pendingText) {
+  if (!button) {
+    return;
+  }
+  if (!button.dataset.idleText) {
+    button.dataset.idleText = button.textContent || "";
+  }
+  button.disabled = busy;
+  button.textContent = busy ? pendingText : button.dataset.idleText;
 }
 
 function formatBytes(bytes) {
@@ -387,40 +457,24 @@ function createProgressStream(progressRenderer) {
 }
 
 async function loadDuelDecks(form, resultsEl, sourceResultsEl) {
-  resultsEl.innerHTML = "";
-  sourceResultsEl.innerHTML = "";
+  resultsEl.innerHTML = renderEmptyState("Building duel deck bundles...");
+  sourceResultsEl.innerHTML = renderEmptyState("Preparing the ranked source pool...");
 
   const params = new URLSearchParams(new FormData(form));
-  const response = await fetch(`/api/duel-decks?${params.toString()}`);
+  return fetchJson(`/api/duel-decks?${params.toString()}`);
+}
 
-  if (!response.ok) {
-    return;
-  }
-
-  const data = await response.json();
-  const duelDeckCount = Array.isArray(data.duel_decks) ? data.duel_decks.length : 0;
-  const sourceDeckCount = Array.isArray(data.source_decks) ? data.source_decks.length : 0;
-
-  if (duelDeckCount > 0) {
-    resultsEl.innerHTML = data.duel_decks.map(renderDuelDeck).join("");
-  } else {
-    resultsEl.innerHTML = renderEmptyState("No duel deck bundles matched these ranked deck filters.");
-  }
-
-  sourceResultsEl.innerHTML = sourceDeckCount
-    ? data.source_decks.map(renderSourceDeck).join("")
-    : renderEmptyState("No ranked individual decks matched these filters.");
+async function loadPathDecks(form, resultsEl) {
+  resultsEl.innerHTML = renderEmptyState("Loading Path of Legends decks...");
+  const params = new URLSearchParams(new FormData(form));
+  return fetchJson(`/api/decks?${params.toString()}`);
 }
 
 async function loadStats(statsEl) {
-  statsEl.innerHTML = "Loading stats...";
-  const response = await fetch("/api/admin/stats");
-  if (!response.ok) {
-    statsEl.textContent = "Failed to load stats.";
-    return;
-  }
-  const data = await response.json();
+  statsEl.innerHTML = renderStatCard("Status", "Loading stats...");
+  const data = await fetchJson("/api/admin/stats");
   statsEl.innerHTML = renderStats(data);
+  return data;
 }
 
 async function refreshProgressSnapshot(progressRenderer) {
@@ -447,8 +501,12 @@ async function runAdminAction(
   action,
   adminButtons,
   statsEl,
+  pathResultsEl,
   resultsEl,
   sourceResultsEl,
+  pathSummaryEl,
+  duelSummaryEl,
+  sourceSummaryEl,
   progressElements,
   progressRenderer,
   progressStream,
@@ -537,22 +595,39 @@ async function runAdminAction(
   }
 
   await loadStats(statsEl);
+  pathResultsEl.innerHTML = renderEmptyState("Refresh the ranked board after admin jobs change the dataset.");
   resultsEl.innerHTML = "";
   sourceResultsEl.innerHTML = "";
+  resultsEl.innerHTML = renderEmptyState("Build duel decks again to reflect the updated dataset.");
+  sourceResultsEl.innerHTML = renderEmptyState("The ranked source pool will repopulate after the next duel query.");
+  setText(pathSummaryEl, "Ranked ladder decks will appear here after the board loads.");
+  setText(duelSummaryEl, "Four-deck duel lineups will appear here after the builder runs.");
+  setText(sourceSummaryEl, "The ranked deck pool feeding duel bundles will appear here.");
   setAdminButtonsDisabled(adminButtons, false);
 }
 
 function initPage() {
-  const form = document.getElementById("duel-deck-form");
-  const daysInputEl = document.getElementById("days-input");
-  const daysValueEl = document.getElementById("days-value");
-  const resultsEl = document.getElementById("results");
+  const pathForm = document.getElementById("path-deck-form");
+  const duelForm = document.getElementById("duel-deck-form");
+  const pathDaysInputEl = document.getElementById("path-days-input");
+  const pathDaysValueEl = document.getElementById("path-days-value");
+  const duelDaysInputEl = document.getElementById("duel-days-input");
+  const duelDaysValueEl = document.getElementById("duel-days-value");
+  const pathResultsEl = document.getElementById("path-results");
+  const pathSummaryEl = document.getElementById("path-summary");
+  const duelResultsEl = document.getElementById("duel-results");
+  const duelSummaryEl = document.getElementById("duel-summary");
   const sourceResultsEl = document.getElementById("source-results");
+  const sourceSummaryEl = document.getElementById("source-summary");
   const statsEl = document.getElementById("db-stats");
   const refreshStatsButton = document.getElementById("refresh-stats");
   const adminButtons = Array.from(document.querySelectorAll("[data-admin-action]"));
+  const viewButtons = Array.from(document.querySelectorAll("[data-view-button]"));
+  const viewPanels = Array.from(document.querySelectorAll("[data-view-panel]"));
   const progressModalEl = document.getElementById("progress-modal");
   const progressCloseEl = document.getElementById("progress-close");
+  const pathSubmitButton = pathForm?.querySelector("button[type='submit']");
+  const duelSubmitButton = duelForm?.querySelector("button[type='submit']");
   const progressElements = {
     modal: progressModalEl,
     title: document.getElementById("progress-title"),
@@ -564,8 +639,10 @@ function initPage() {
   };
 
   if (
-    !form || !daysInputEl || !daysValueEl || !resultsEl || !sourceResultsEl ||
-    !statsEl || !refreshStatsButton || !progressModalEl ||
+    !pathForm || !duelForm || !pathDaysInputEl || !pathDaysValueEl || !duelDaysInputEl ||
+    !duelDaysValueEl || !pathResultsEl || !pathSummaryEl || !duelResultsEl || !duelSummaryEl ||
+    !sourceResultsEl || !sourceSummaryEl || !statsEl || !refreshStatsButton || !progressModalEl ||
+    !pathSubmitButton || !duelSubmitButton ||
     !progressCloseEl || !progressElements.title || !progressElements.status ||
     !progressElements.fill || !progressElements.percent || !progressElements.error
   ) {
@@ -574,12 +651,140 @@ function initPage() {
 
   const progressRenderer = createProgressRenderer(progressElements);
   const progressStream = createProgressStream(progressRenderer);
-  const syncDaysValue = () => {
-    daysValueEl.textContent = daysInputEl.value;
+  let statsLoaded = false;
+  let pathLoaded = false;
+  let duelLoaded = false;
+
+  const syncDaysValue = (input, output) => {
+    output.textContent = input.value;
   };
 
-  syncDaysValue();
-  daysInputEl.addEventListener("input", syncDaysValue);
+  syncDaysValue(pathDaysInputEl, pathDaysValueEl);
+  syncDaysValue(duelDaysInputEl, duelDaysValueEl);
+  pathDaysInputEl.addEventListener("input", () => syncDaysValue(pathDaysInputEl, pathDaysValueEl));
+  duelDaysInputEl.addEventListener("input", () => syncDaysValue(duelDaysInputEl, duelDaysValueEl));
+
+  pathResultsEl.innerHTML = renderEmptyState("Ranked ladder decks will appear here after the board loads.");
+  duelResultsEl.innerHTML = renderEmptyState("Four-deck duel lineups will appear here after the builder runs.");
+  sourceResultsEl.innerHTML = renderEmptyState("The ranked deck pool feeding duel bundles will appear here.");
+
+  async function refreshPathDecks() {
+    setButtonBusy(pathSubmitButton, true, "Loading board...");
+    try {
+      const data = await loadPathDecks(pathForm, pathResultsEl);
+      const params = new URLSearchParams(new FormData(pathForm));
+      const days = Number(params.get("days") || 0);
+      const deckCount = Array.isArray(data) ? data.length : 0;
+
+      if (deckCount > 0) {
+        pathResultsEl.innerHTML = data.map(renderPathDeck).join("");
+        setText(
+          pathSummaryEl,
+          `Showing ${pluralize(deckCount, "ranked deck")} from the last ${pluralize(days, "day")}.`,
+        );
+      } else {
+        pathResultsEl.innerHTML = renderEmptyState("No Path of Legends decks matched these filters.");
+        setText(pathSummaryEl, "No ranked decks matched the current Path of Legends filters.");
+      }
+      pathLoaded = true;
+    } catch (error) {
+      pathLoaded = false;
+      pathResultsEl.innerHTML = renderEmptyState(
+        error instanceof Error ? error.message : "Failed to load Path of Legends decks.",
+        "error",
+      );
+      setText(pathSummaryEl, "Path of Legends query failed.");
+    } finally {
+      setButtonBusy(pathSubmitButton, false, "Loading board...");
+    }
+  }
+
+  async function refreshDuelDecks() {
+    setButtonBusy(duelSubmitButton, true, "Building duel decks...");
+    try {
+      const data = await loadDuelDecks(duelForm, duelResultsEl, sourceResultsEl);
+      const duelDeckCount = Array.isArray(data.duel_decks) ? data.duel_decks.length : 0;
+      const sourceDeckCount = Array.isArray(data.source_decks) ? data.source_decks.length : 0;
+
+      duelResultsEl.innerHTML = duelDeckCount
+        ? data.duel_decks.map(renderDuelDeck).join("")
+        : renderEmptyState("No duel deck bundles matched these ranked deck filters.");
+      sourceResultsEl.innerHTML = sourceDeckCount
+        ? data.source_decks.map(renderSourceDeck).join("")
+        : renderEmptyState("No ranked candidate decks matched these filters.");
+
+      setText(
+        duelSummaryEl,
+        duelDeckCount
+          ? `Built ${pluralize(duelDeckCount, "duel bundle")} from ${pluralize(sourceDeckCount, "candidate deck")}.`
+          : "No duel bundles could be built from the current ranked source pool.",
+      );
+      setText(
+        sourceSummaryEl,
+        sourceDeckCount
+          ? `Using ${pluralize(sourceDeckCount, "ranked candidate deck")} from a pool of ${data.source_pool_size}.`
+          : "No ranked candidate decks were available for the current duel filters.",
+      );
+      duelLoaded = true;
+    } catch (error) {
+      duelLoaded = false;
+      duelResultsEl.innerHTML = renderEmptyState(
+        error instanceof Error ? error.message : "Failed to load duel decks.",
+        "error",
+      );
+      sourceResultsEl.innerHTML = renderEmptyState("The ranked source pool could not be loaded.", "error");
+      setText(duelSummaryEl, "Duel deck query failed.");
+      setText(sourceSummaryEl, "Source pool query failed.");
+    } finally {
+      setButtonBusy(duelSubmitButton, false, "Building duel decks...");
+    }
+  }
+
+  async function ensureStatsLoaded() {
+    if (statsLoaded) {
+      return;
+    }
+    try {
+      await loadStats(statsEl);
+      statsLoaded = true;
+    } catch (_error) {
+      statsLoaded = false;
+      statsEl.innerHTML = renderStatCard("Status", "Failed to load stats.");
+    }
+  }
+
+  async function setActiveView(nextView, updateHash = true) {
+    const selectedView = viewPanels.some((panel) => panel.dataset.viewPanel === nextView) ? nextView : "path";
+
+    viewButtons.forEach((button) => {
+      const isActive = button.dataset.viewButton === selectedView;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+      button.tabIndex = isActive ? 0 : -1;
+    });
+
+    viewPanels.forEach((panel) => {
+      const isActive = panel.dataset.viewPanel === selectedView;
+      panel.classList.toggle("is-active", isActive);
+      panel.hidden = !isActive;
+    });
+
+    if (updateHash) {
+      history.replaceState(null, "", `#${selectedView}`);
+    }
+
+    if (selectedView === "path" && !pathLoaded) {
+      await refreshPathDecks();
+      return;
+    }
+    if (selectedView === "duel" && !duelLoaded) {
+      await refreshDuelDecks();
+      return;
+    }
+    if (selectedView === "admin") {
+      await ensureStatsLoaded();
+    }
+  }
 
   progressCloseEl.addEventListener("click", async () => {
     const currentProgress = progressRenderer.current();
@@ -615,19 +820,25 @@ function initPage() {
 
   hideProgressModal(progressModalEl);
 
-  form.addEventListener("submit", async (event) => {
+  pathForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    try {
-      await loadDuelDecks(form, resultsEl, sourceResultsEl);
-    } catch (_error) {}
+    await refreshPathDecks();
+  });
+
+  duelForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await refreshDuelDecks();
   });
 
   refreshStatsButton.addEventListener("click", async () => {
-    try {
-      await loadStats(statsEl);
-    } catch (_error) {
-      statsEl.textContent = "Failed to load stats.";
-    }
+    statsLoaded = false;
+    await ensureStatsLoaded();
+  });
+
+  viewButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      await setActiveView(button.dataset.viewButton || "path");
+    });
   });
 
   adminButtons.forEach((button) => {
@@ -640,20 +851,31 @@ function initPage() {
           button.dataset.adminAction,
           adminButtons,
           statsEl,
-          resultsEl,
+          pathResultsEl,
+          duelResultsEl,
           sourceResultsEl,
+          pathSummaryEl,
+          duelSummaryEl,
+          sourceSummaryEl,
           progressElements,
           progressRenderer,
           progressStream,
         );
+        statsLoaded = true;
+        pathLoaded = false;
+        duelLoaded = false;
       } catch (_error) {
         setAdminButtonsDisabled(adminButtons, false);
       }
     });
   });
 
-  loadStats(statsEl).catch(() => {
-    statsEl.textContent = "Failed to load stats.";
+  window.addEventListener("hashchange", () => {
+    setActiveView((window.location.hash || "#path").slice(1), false).catch(() => {});
+  });
+
+  setActiveView((window.location.hash || "#path").slice(1), false).catch(() => {
+    pathResultsEl.innerHTML = renderEmptyState("Failed to initialize the default view.", "error");
   });
 
   registerServiceWorker();

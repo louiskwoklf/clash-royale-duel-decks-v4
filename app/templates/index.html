@@ -1,83 +1,342 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <h1>Clash Royale Duel Decks</h1>
-</section>
-
-<section class="panel">
-  <div class="panel-header">
-    <div>
-      <h2>Build Duel Decks</h2>
+<section class="hero-shell">
+  <div class="hero-copy">
+    <p class="eyebrow">Deck Control Center</p>
+    <h1>Clash Royale Deck Forge</h1>
+    <p class="hero-copy-text">
+      Shift between ranked ladder scouting, duel lineup building, and admin controls without
+      leaving the page.
+    </p>
+  </div>
+  <div class="hero-rail">
+    <article class="hero-callout">
+      <span class="callout-label">Pattern-led redesign</span>
+      <strong>Built to sit on the new rhombus arena texture.</strong>
+      <p>
+        The interface now uses darker cobalt glass, gold actions, and cleaner result cards so the
+        tiled background stays present without crushing legibility.
+      </p>
+    </article>
+    <div class="hero-stats">
+      <article class="mini-stat">
+        <span>Path of Legends</span>
+        <strong>Ranked meta board</strong>
+      </article>
+      <article class="mini-stat">
+        <span>Duel Decks</span>
+        <strong>Four-deck bundles</strong>
+      </article>
+      <article class="mini-stat">
+        <span>Admin</span>
+        <strong>Ingestion controls</strong>
+      </article>
     </div>
   </div>
-  <form id="duel-deck-form" class="query-grid duel-query-grid">
-    <label class="slider-field">
-      <div class="field-head">
-        <span>Days</span>
-        <output id="days-value" for="days-input">{{ defaults.days }}</output>
+</section>
+
+<nav class="view-switcher" role="tablist" aria-label="Deck workspace views">
+  <button
+    id="view-tab-path"
+    type="button"
+    class="view-button is-active"
+    data-view-button="path"
+    role="tab"
+    aria-selected="true"
+    aria-controls="view-panel-path"
+  >
+    <span class="view-title">Path of Legends</span>
+    <span class="view-copy">Build a ranked deck board.</span>
+  </button>
+  <button
+    id="view-tab-duel"
+    type="button"
+    class="view-button"
+    data-view-button="duel"
+    role="tab"
+    aria-selected="false"
+    aria-controls="view-panel-duel"
+    tabindex="-1"
+  >
+    <span class="view-title">Duel Decks</span>
+    <span class="view-copy">Assemble four unique decks.</span>
+  </button>
+  <button
+    id="view-tab-admin"
+    type="button"
+    class="view-button"
+    data-view-button="admin"
+    role="tab"
+    aria-selected="false"
+    aria-controls="view-panel-admin"
+    tabindex="-1"
+  >
+    <span class="view-title">Admin</span>
+    <span class="view-copy">Run sync and cleanup jobs.</span>
+  </button>
+</nav>
+
+<section
+  id="view-panel-path"
+  class="workspace-view is-active"
+  data-view-panel="path"
+  role="tabpanel"
+  aria-labelledby="view-tab-path"
+>
+  <div class="workspace-columns">
+    <section class="panel control-panel">
+      <div class="panel-header panel-header-stack">
+        <div>
+          <p class="eyebrow">Path of Legends</p>
+          <h2>Ranked Deck Board</h2>
+          <p class="panel-copy">
+            Pull the highest-ranked ladder decks from recent Path of Legends battles and filter by
+            include or exclude cards.
+          </p>
+        </div>
       </div>
-      <input id="days-input" type="range" name="days" value="{{ defaults.days }}" min="1" max="7" step="1">
-    </label>
-    <label>
-      <span>Include cards</span>
-      <input type="text" name="include" placeholder="hog-rider, earthquake">
-    </label>
-    <label>
-      <span>Exclude cards</span>
-      <input type="text" name="exclude" placeholder="mirror">
-    </label>
-    <button type="submit">Build duel decks</button>
-  </form>
+      <form id="path-deck-form" class="query-grid path-query-grid">
+        <label class="slider-field">
+          <div class="field-head">
+            <span>Days</span>
+            <output id="path-days-value" for="path-days-input">{{ defaults.days }}</output>
+          </div>
+          <input
+            id="path-days-input"
+            type="range"
+            name="days"
+            value="{{ defaults.days }}"
+            min="1"
+            max="7"
+            step="1"
+          >
+        </label>
+        <label>
+          <span>Limit</span>
+          <input
+            id="path-limit-input"
+            type="number"
+            name="limit"
+            value="{{ defaults.limit }}"
+            min="1"
+            max="100"
+            step="1"
+          >
+        </label>
+        <label>
+          <span>Include cards</span>
+          <input type="text" name="include" placeholder="hog-rider, earthquake">
+        </label>
+        <label>
+          <span>Exclude cards</span>
+          <input type="text" name="exclude" placeholder="mirror">
+        </label>
+        <button type="submit">Load ranked board</button>
+      </form>
+    </section>
+    <aside class="panel info-panel">
+      <div class="panel-header panel-header-stack">
+        <div>
+          <p class="eyebrow">Scoring Lens</p>
+          <h2>How the board ranks decks</h2>
+        </div>
+      </div>
+      <div class="signal-grid">
+        <article class="signal-card">
+          <span>Confidence</span>
+          <p>Rewards decks that win often with enough sample size to trust the signal.</p>
+        </article>
+        <article class="signal-card">
+          <span>Popularity</span>
+          <p>Surfaces decks used by more distinct players across the ranked pool.</p>
+        </article>
+        <article class="signal-card">
+          <span>Stability</span>
+          <p>Prefers decks that stay reliable across multiple days instead of spiking once.</p>
+        </article>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel results-panel">
+    <div class="panel-header">
+      <div>
+        <p class="eyebrow">Results</p>
+        <h2>Path of Legends Decks</h2>
+        <p id="path-summary" class="panel-copy">
+          Ranked ladder decks will appear here after the board loads.
+        </p>
+      </div>
+    </div>
+    <section id="path-results" class="results path-results" aria-live="polite"></section>
+  </section>
 </section>
 
-<section class="panel">
-  <div class="panel-header">
-    <div>
-      <h2>Duel Deck Results</h2>
-    </div>
+<section
+  id="view-panel-duel"
+  class="workspace-view"
+  data-view-panel="duel"
+  role="tabpanel"
+  aria-labelledby="view-tab-duel"
+  hidden
+>
+  <div class="workspace-columns">
+    <section class="panel control-panel">
+      <div class="panel-header panel-header-stack">
+        <div>
+          <p class="eyebrow">Duel Decks</p>
+          <h2>Build Four-Deck Bundles</h2>
+          <p class="panel-copy">
+            Search the ranked source pool, then assemble bundles with zero overlapping cards across
+            all four decks.
+          </p>
+        </div>
+      </div>
+      <form id="duel-deck-form" class="query-grid duel-query-grid">
+        <label class="slider-field">
+          <div class="field-head">
+            <span>Days</span>
+            <output id="duel-days-value" for="duel-days-input">{{ defaults.days }}</output>
+          </div>
+          <input
+            id="duel-days-input"
+            type="range"
+            name="days"
+            value="{{ defaults.days }}"
+            min="1"
+            max="7"
+            step="1"
+          >
+        </label>
+        <label>
+          <span>Include cards</span>
+          <input type="text" name="include" placeholder="hog-rider, earthquake">
+        </label>
+        <label>
+          <span>Exclude cards</span>
+          <input type="text" name="exclude" placeholder="mirror">
+        </label>
+        <button type="submit">Build duel decks</button>
+      </form>
+    </section>
+    <aside class="panel info-panel">
+      <div class="panel-header panel-header-stack">
+        <div>
+          <p class="eyebrow">Bundle Rules</p>
+          <h2>Duel constraints</h2>
+        </div>
+      </div>
+      <div class="signal-grid">
+        <article class="signal-card">
+          <span>{{ defaults.duel_deck_pool_size }} source decks</span>
+          <p>The duel builder searches a ranked candidate pool before combining bundles.</p>
+        </article>
+        <article class="signal-card">
+          <span>32 unique cards</span>
+          <p>Any candidate with overlap is discarded so each duel lineup stays fully unique.</p>
+        </article>
+        <article class="signal-card">
+          <span>Total score</span>
+          <p>Bundles are sorted by combined deck strength, games played, and player spread.</p>
+        </article>
+      </div>
+    </aside>
   </div>
-  <section id="results" class="results duel-results" aria-live="polite"></section>
+
+  <div class="workspace-columns stacked-columns">
+    <section class="panel results-panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Results</p>
+          <h2>Duel Deck Bundles</h2>
+          <p id="duel-summary" class="panel-copy">
+            Four-deck duel lineups will appear here after the builder runs.
+          </p>
+        </div>
+      </div>
+      <section id="duel-results" class="results duel-results" aria-live="polite"></section>
+    </section>
+
+    <section class="panel results-panel panel-subdued">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Source Pool</p>
+          <h2>Ranked Candidate Decks</h2>
+          <p id="source-summary" class="panel-copy">
+            The ranked deck pool feeding duel bundles will appear here.
+          </p>
+        </div>
+      </div>
+      <section id="source-results" class="results source-results" aria-live="polite"></section>
+    </section>
+  </div>
 </section>
 
-<section class="panel">
-  <div class="panel-header">
-    <div>
-      <h2>Ranked Deck Pool</h2>
-    </div>
-  </div>
-  <section id="source-results" class="results source-results" aria-live="polite"></section>
-</section>
+<section
+  id="view-panel-admin"
+  class="workspace-view"
+  data-view-panel="admin"
+  role="tabpanel"
+  aria-labelledby="view-tab-admin"
+  hidden
+>
+  <div class="workspace-columns admin-columns">
+    <section class="panel stats-panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Status</p>
+          <h2>Database Stats</h2>
+          <p class="panel-copy">Use this view to inspect the dataset before or after running jobs.</p>
+        </div>
+        <button type="button" class="secondary-button" id="refresh-stats">Refresh stats</button>
+      </div>
+      <div id="db-stats" class="stats-grid"></div>
+    </section>
 
-<section class="panel stats-panel">
-  <div class="panel-header">
-    <h2>Database Stats</h2>
-    <button type="button" class="secondary-button" id="refresh-stats">Refresh stats</button>
+    <section class="panel admin-panel">
+      <div class="panel-header panel-header-stack">
+        <div>
+          <p class="eyebrow">Pipeline</p>
+          <h2>Ingestion Controls</h2>
+          <p class="panel-copy">Run the live data pipeline in the usual order, or rerun individual steps.</p>
+        </div>
+      </div>
+      <div class="admin-flow">
+        <span class="flow-step">1 Sync cards</span>
+        <span class="flow-step">2 Seed players</span>
+        <span class="flow-step">3 Expand pool</span>
+        <span class="flow-step">4 Ingest battles</span>
+      </div>
+      <div class="admin-section">
+        <h3>Populate live data</h3>
+        <div class="admin-actions">
+          <button type="button" class="admin-button" data-admin-action="sync-cards">Sync cards</button>
+          <button type="button" class="admin-button" data-admin-action="seed-players">Seed players</button>
+          <button type="button" class="admin-button" data-admin-action="expand-player-pool">Expand player pool</button>
+          <button type="button" class="admin-button" data-admin-action="ingest-battles">Ingest battles</button>
+        </div>
+      </div>
+    </section>
   </div>
-  <div id="db-stats" class="stats-grid"></div>
-</section>
 
-<section class="panel admin">
-  <div class="panel-header">
-    <h2>Admin Actions</h2>
-  </div>
-  <div class="admin-section">
-    <h3>Ingestion</h3>
-    <div class="admin-actions">
-      <button type="button" class="admin-button" data-admin-action="sync-cards">Sync cards</button>
-      <button type="button" class="admin-button" data-admin-action="seed-players">Seed players</button>
-      <button type="button" class="admin-button" data-admin-action="expand-player-pool">Expand player pool</button>
-      <button type="button" class="admin-button" data-admin-action="ingest-battles">Ingest battles</button>
+  <section class="panel admin-panel danger-zone">
+    <div class="panel-header panel-header-stack">
+      <div>
+        <p class="eyebrow">Danger Zone</p>
+        <h2>Reset Stored Data</h2>
+        <p class="panel-copy">These actions delete persisted data immediately. Confirm prompts stay in place.</p>
+      </div>
     </div>
-  </div>
-  <div class="admin-section danger-zone">
-    <h3>Clear Data</h3>
-    <div class="admin-actions">
-      <button type="button" class="admin-button secondary-button" data-admin-action="clear-cards" data-confirm="Clear all cards?">Clear cards</button>
-      <button type="button" class="admin-button secondary-button" data-admin-action="clear-players" data-confirm="Clear all players? This also removes linked battle records.">Clear players</button>
-      <button type="button" class="admin-button secondary-button" data-admin-action="clear-battles" data-confirm="Clear all battles, decks, and battle records?">Clear battle data</button>
-      <button type="button" class="admin-button danger-button" data-admin-action="clear-all" data-confirm="Clear everything in the database?">Clear everything</button>
+    <div class="admin-section">
+      <h3>Clear Data</h3>
+      <div class="admin-actions">
+        <button type="button" class="admin-button secondary-button" data-admin-action="clear-cards" data-confirm="Clear all cards?">Clear cards</button>
+        <button type="button" class="admin-button secondary-button" data-admin-action="clear-players" data-confirm="Clear all players? This also removes linked battle records.">Clear players</button>
+        <button type="button" class="admin-button secondary-button" data-admin-action="clear-battles" data-confirm="Clear all battles, decks, and battle records?">Clear battle data</button>
+        <button type="button" class="admin-button danger-button" data-admin-action="clear-all" data-confirm="Clear everything in the database?">Clear everything</button>
+      </div>
     </div>
-  </div>
+  </section>
 </section>
 
 <div id="progress-modal" class="progress-modal" hidden>
