@@ -663,11 +663,6 @@ def ingest_player_battlelog(conn: sqlite3.Connection, api: ClashApiClient, playe
             ),
         )
 
-        if player is not None:
-            upsert_player(conn, {"tag": player.tag, "name": player.name}, source="battlelog")
-        if opponent is not None:
-            upsert_player(conn, {"tag": opponent.tag, "name": opponent.name}, source="battlelog")
-
         result = conn.execute(
             """
             INSERT OR IGNORE INTO deck_observations (
@@ -700,6 +695,9 @@ def ingest_battles(
     conn: sqlite3.Connection,
     api: ClashApiClient,
     progress: ProgressCallback | None = None,
+    *,
+    resume_current: int | None = None,
+    resume_total: int | None = None,
 ) -> int:
     inserted = 0
     completed_count = int(
@@ -721,7 +719,11 @@ def ingest_battles(
     ).fetchall()
     pending_tags = [str(row["tag"]) for row in rows]
     total = completed_count + len(pending_tags)
+    if resume_total is not None:
+        total = max(total, max(0, int(resume_total)))
     current = completed_count
+    if resume_current is not None:
+        current = max(current, max(0, int(resume_current)))
 
     if progress is not None:
         progress(current, total, "Scanning player battle logs...")
@@ -731,5 +733,5 @@ def ingest_battles(
         inserted += ingest_player_battlelog(conn, api, player_tag)
         conn.commit()
         if progress is not None:
-            progress(completed_count + index, total, player_tag)
+            progress(current + index, total, player_tag)
     return inserted

@@ -331,6 +331,8 @@ def expand_player_pool_route():
 @router.post("/api/admin/ingest-battles", response_model=AdminActionResponse)
 def ingest_battles_route():
     ensure_no_active_job()
+    previous_progress = progress_tracker.snapshot()
+    resume = previous_progress.get("status") == "stopped" and previous_progress.get("action") == "ingest-battles"
     with get_conn() as conn:
         player_count = int(conn.execute("SELECT COUNT(*) AS count FROM players").fetchone()["count"])
         completed_count = int(
@@ -346,8 +348,8 @@ def ingest_battles_route():
         action="ingest-battles",
         label="Ingest Battles",
         unit="players",
-        current=completed_count,
-        total=player_count,
+        current=max(completed_count, int(previous_progress["current"])) if resume else completed_count,
+        total=max(player_count, int(previous_progress["total"])) if resume else player_count,
         message="Scanning player battle logs...",
         stoppable=True,
     )
@@ -363,6 +365,8 @@ def ingest_battles_route():
                 count = ingest_battles(
                     conn,
                     api,
+                    resume_current=int(previous_progress["current"]) if resume else None,
+                    resume_total=int(previous_progress["total"]) if resume else None,
                     progress=lambda current, total, message: progress_tracker.update(
                         current=current,
                         total=total,
